@@ -1,13 +1,13 @@
-## SpiProtocolaParserCLi
+## SpiProtocolParserCLi
 
 ### 介绍
 
-> SpiProtocolaParserCLi：是基于Python 3.7 开发的一个嵌入式CLi应用
+> SpiProtocolParserCLi：是基于Python 3.7 开发的一个嵌入式CLi应用
 
 
 ### 说明
 ```
-usage: python SpiProtocolaParserCLi.py [-h] [--offset] [--verb] [--info] [--debug]
+usage: python SpiProtocolParserCLi.py [-h] [--offset] [--verb] [--info] [--debug]
                        [-p {spi,rda}] [-f F] [-d D] [-v]
 
 欢迎使用本打包工具
