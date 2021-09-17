@@ -1,3 +1,4 @@
+#!/Users/abc/workshop/abc/project/utils/anaconda3/envs/py37/bin/python
 # -*- coding:utf-8 -*-
 #*************************************************************************
 #	> File Name: LSFactoryPacker.py
@@ -18,6 +19,9 @@ global_frame_count = 0
 global_frame_head_len = 16
 
 GLOMAL_SPI_NORMAL = False
+
+g_stitich_image_using_offset = False
+g_local_logger_debug = False
 
 global_output_directory = {
     'cut_out_images': {
@@ -120,17 +124,17 @@ def get_spi_frame_checksum(index, frame_list):
         return ( get_spi_frame_mosi_data(frame_list[index+15]) + get_spi_frame_mosi_data(frame_list[index+14]) * (2**8) )   
 
 def print_spi_frame_head(index, frame_list):
-    logger.LOGV('TAG:', get_spi_frame_tag(index, frame_list), \
-          'version', get_spi_frame_version(index, frame_list), \
-          'fuid', get_spi_frame_fuid(index, frame_list), \
-          'type', get_spi_frame_type(index, frame_list), \
-          'fmt', get_spi_frame_fmt(index, frame_list), \
-          'xset', get_spi_frame_xset(index, frame_list), \
-          'yset', get_spi_frame_yset(index, frame_list), \
-          'width', get_spi_frame_width(index, frame_list), \
-          'heigh', get_spi_frame_heigh(index, frame_list), \
-          'depth', get_spi_frame_depth(index, frame_list), \
-          'checksum', get_spi_frame_checksum(index, frame_list)
+    logger.LOGV('TAG: {}'.format( get_spi_frame_tag(index, frame_list) ), \
+            'version: {}'.format( get_spi_frame_version(index, frame_list) ), \
+            'fuid: {}'.format( get_spi_frame_fuid(index, frame_list) ), \
+            'type: {}'.format( get_spi_frame_type(index, frame_list) ), \
+            'fmt: {}'.format( get_spi_frame_fmt(index, frame_list) ), \
+            'xset: {}'.format( get_spi_frame_xset(index, frame_list) ), \
+            'yset: {}'.format( get_spi_frame_yset(index, frame_list) ), \
+            'width: {}'.format( get_spi_frame_width(index, frame_list) ), \
+            'heigh: {}'.format( get_spi_frame_heigh(index, frame_list) ), \
+            'depth: {}'.format( get_spi_frame_depth(index, frame_list) ), \
+            'checksum: {}'.format( get_spi_frame_checksum(index, frame_list) )
         )
 
 def get_spi_rda_line_start_data(index, frame_list):
@@ -164,8 +168,9 @@ def get_spi_frame_data(index, frame_list):
     frame_data = []
     raw_data = [ get_spi_frame_mosi_data(i) for i in frame_list[index + global_frame_head_len : (index + global_frame_head_len + (frames -1 )*12 + local_width * local_heigh) ] ]
     # print('raw_data:', raw_data)
-    logger.LOGV('raw_data', 'frames:',frames, 'len:', len(raw_data))
-    logger.print_hex(raw_data)
+    #logger.LOGV('raw_data', 'frames:',frames, 'len:', len(raw_data))
+    if g_local_logger_debug:
+        logger.print_hex(raw_data)
 
     for i, value in enumerate(raw_data):
         if i > len(raw_data) - 12:
@@ -183,15 +188,16 @@ def get_spi_frame_data(index, frame_list):
             
             continue
         frame_data.append(value)
-    logger.LOGV('frame_data', 'len:', len(frame_data), 'line_count:', line_count) 
+    #logger.LOGV('frame_data', 'len:', len(frame_data), 'line_count:', line_count) 
     
     
     local_cal_checksum = calc_list_sum(frame_data) & 0xFFFF
-    print(f'spi_checksum:{local_checksum}, calc_checksum:{local_cal_checksum}')
 
     if local_checksum != local_cal_checksum:
         logger.LOGE('SPI checksum fails')
-        exit_app()
+        logger.LOGE(f'spi_checksum:{local_checksum}, calc_checksum:{local_cal_checksum}')
+        #return []
+        #exit_app()
 
     return frame_data
 
@@ -203,26 +209,29 @@ def calc_list_sum(list_data):
 def camera_spi_parse(frame, index, frame_list):
     global global_frame_count
     global_frame_count += 1
-    logger.LOGV(index, global_frame_count)
+    #logger.LOGV(index, global_frame_count)
     print_spi_frame_head(index, frame_list)
 
     spi_frame_data = get_spi_frame_data(index, frame_list)
 
-    print('camera_spi_parse: ', len(spi_frame_data))
+    #logger.LOGI('camera_spi_parse: ', len(spi_frame_data))
     # print(spi_frame_data)
 
     # 生成bin文件
     binary_images_save_path = os.path.join( global_output_directory.get('binary_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.bin')
     generate_binary_images(spi_frame_data, output= binary_images_save_path)
 
+    logger.LOGD('generate_binary_images done')
     # 生成裁剪图片
     cut_out_images_save_path = os.path.join(global_output_directory.get('cut_out_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.bmp')
     generate_cut_out_images(spi_frame_data, width=get_spi_frame_width(index, frame_list), height=get_spi_frame_heigh(index, frame_list), output=cut_out_images_save_path)
+    logger.LOGD('generate_cut_out_images done')
     
     return {'width':get_spi_frame_width(index, frame_list), \
             'heigh': get_spi_frame_heigh(index, frame_list), \
             'xset': get_spi_frame_xset(index, frame_list), \
             'yset': get_spi_frame_yset(index, frame_list), \
+            'fuid': get_spi_frame_fuid(index, frame_list), \
             'file_path': cut_out_images_save_path }
 
 def get_spi_frame_info(frame, index, frame_list):
@@ -245,6 +254,7 @@ def get_spi_data(file_name):
             info = camera_spi_parse(frame, index, spi_data_list)
             frame_info.append(info)
 
+    #print(frame_info)
     # 生成拼接图片
     generate_stitch_image(frame_info, global_output_directory.get('stitching_images').get('file') )
 
@@ -255,7 +265,11 @@ def generate_binary_images(frame_data, output):
     utils.write_bin_list_to_file(frame_data, output)
 
 def generate_stitch_image(frame_info, output):
-    utils.connect_bmp(frame_info, output)
+    global g_stitich_image_using_offset
+    if g_stitich_image_using_offset:
+        utils.connect_bmp(frame_info, output, using_offset=True)
+    else:
+        utils.connect_bmp(frame_info, output)
 
 
 def get_file_full_path(file_dir): 
@@ -280,6 +294,8 @@ def stitch_image(pics_dir):
     else:
         print(f'拼接失败 目标文件夹: {pics_dir}', images_list)
 
+def set_log_level(level):
+    logger.set_log_level(level)
 
 def app_main(file_name):
     if not os.path.isfile(file_name):
@@ -291,17 +307,41 @@ def app_main(file_name):
             utils.dirs(global_output_directory.get(item).get('dir'))
 
     get_spi_data(file_name)
+    table_element_list = list()
+    for item in global_output_directory.keys():
+        if 'dir' in global_output_directory.get(item).keys():
+            if 'file' in global_output_directory.get(item).keys():
+                #logger.LOGV(item , '=>', os.path.join(global_output_directory.get(item).get('dir'), global_output_directory.get(item).get('file')))
+                item_value = global_output_directory.get(item).get('file')
+                table_element_list.append([item, item_value])
+            else:
+                #logger.LOGV(item , '=>', global_output_directory.get(item).get('dir'))
+                item_value = global_output_directory.get(item).get('dir')
+                table_element_list.append([item, item_value])
+    # 生成结果
+    logger.LOGB('\n生成结果')
+    print(utils.table_prompt(table_element_list))
+
+
+    # 显示拼接图
+    ret = utils.run_shell('command -v imgcat')
+    item = 'stitching_images'
+    stitch_image_file_path = global_output_directory.get(item).get('file')
+
+    if ret.returncode == 0 and os.path.isfile(os.path.join( stitch_image_file_path ) ):
+        logger.LOGB('\nstitch结果')
+        os.system('imgcat {}'.format( stitch_image_file_path ))
 
 def version_print():
-    description = '''
-Version: v1.0\n 
-Time: 2021/8/17\n  
-Author: theirrycao\n
-RELEASE:\n
-支持SPI协议和RDA协议解析，默认是SPI协议
-
-'''
-    description = logger.get_yellow_text(description)
+    import time
+    description = [
+['Version', 'v1.0' ],
+['Time', time.ctime() ], 
+['Author', 'theirrycao' ],
+['RELEASE', '支持SPI协议和RDA协议解析，默认是SPI协议' ]
+]
+    description = utils.table_prompt(description)
+    #description = logger.get_yellow_text(description)
     return description
 
 def parse_user_choice():
@@ -310,12 +350,17 @@ def parse_user_choice():
     try:
         parser = argparse.ArgumentParser(description='欢迎使用本打包工具')
         # parser.add_argument("-c", type=int, choices=[1,2], help="芯片类型[1:300x 2:4002][已废弃，使用默认资源，不支持修改]")
+        parser.add_argument("--offset", dest="offset", action='store_true', help="使用偏移位置进行拼接")
+        parser.add_argument("--verb", dest="verb", action='store_true', help="打开VERB信息")
+        parser.add_argument("--info", dest="info", action='store_true', help="打开info信息")
+        parser.add_argument("--debug", dest="debug", action='store_true', help="打开调试信息")
         parser.add_argument("-p", type=str, required = False, choices=['spi','rda'], help="协议形式: spi 或者 rda")
         parser.add_argument("-f", type=str, required = False, help="逻辑分析仪协议导出数据[*.csv]")
         parser.add_argument("-d", type=str, required = False, help="待拼接图片文件夹")
         parser.add_argument("-v", action="version", version=version_print())
         
         args = parser.parse_args()
+        print('parse_user_choice', args)
         # args = parser.parse_args(choice.split())
     # args = parser.parse_args(['-main', './main.bin', '-cmd', './cmd.bin', '-bias', './bias.bin', '-mlp', './mlp.bin'])
     except Exception as e:
@@ -326,22 +371,34 @@ def parse_user_choice():
 
 def main():
     global GLOMAL_SPI_NORMAL
+    global g_stitich_image_using_offset
     init()
 
     args = parse_user_choice()
+    logger.LOGI(args)
     if not args:
         print('缺乏参数')
         return
     GLOMAL_SPI_NORMAL = True if args.p == 'spi' else False
 
-    logger.LOGI(args)
+    if args.offset:
+        g_stitich_image_using_offset = True
+    if args.debug:
+        g_local_logger_debug = True
+        set_log_level('dbg')
+    if args.info:
+        set_log_level('info')
+    if args.verb:
+        set_log_level('verb')
     if args.f and os.path.isfile(args.f):
         app_main(args.f)
     elif args.d and os.path.isdir(args.d):
         # print(stitch_image)
         stitch_image(args.d)
-    elif not os.path.isdir(args.d):
+    elif args.d and not os.path.isdir(args.d):
         print(f'不存在: {args.d}这个文件夹')
+    else:
+        print(version_print())
 
 
 if __name__ == '__main__':

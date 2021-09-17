@@ -31,7 +31,7 @@ def is_python2():
 #         return int(data.hex(), 16)
 #     return None
 def get_platform_system():
-    return platform.system()
+    return platform.system().lower()
 
 def isPlatformWin():
     return True if get_platform_system() == 'Windows' else False
@@ -40,15 +40,20 @@ def run_shell(cmd):
     import subprocess
     def runcmd(command):
         ret = subprocess.run(command,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,encoding="utf-8",timeout=1)
+        '''
         if ret.returncode == 0:
             print("success:",ret)
         else:
             print("error:",ret)
-    runcmd(cmd)
+        '''
+        return ret
+    return runcmd(cmd)
 
 
-def bytes2Int(bytes_t, signed=True):
-    return int.from_bytes(bytes_t, 'little', signed=signed)
+def bytes2Int(bytes_t, signed=True, endion='little'):
+    return int.from_bytes(bytes_t, endion, signed=signed)
+def int2Bytes(int_t, bytes_t, signed=True, endion='little'):
+    return int_t.to_bytes(bytes_t, byteorder=endion, signed=signed)
 def dirs(dirs):
     try:
         if dirs and (not os.path.isdir(dirs)):
@@ -80,7 +85,7 @@ def is_windows():
         return False
 
 def is_number(s):
-    if not s:
+    if s is None:
         return False
     try:
         float(s)
@@ -94,8 +99,32 @@ def is_number(s):
         return True
     except (TypeError, ValueError):
         pass
+
+    try:
+        int(s, 16)
+        return True 
+    except (TypeError, ValueError):
+        pass
  
     return False
+
+def is_file_exists(path):
+    import os 
+    return os.path.isfile(os.path.expanduser(path))
+
+def str2int(s):
+    if is_number(s):
+        try:
+            ret = int(s)
+            return ret 
+        except (TypeError, ValueError):
+            pass 
+        try:
+            ret = int(s, 16)
+            return ret 
+        except (TypeError, ValueError):
+            pass 
+    return -1
 
 def is_csv_file(src_file):
     if not (src_file and os.path.isfile(src_file)):
@@ -125,6 +154,24 @@ def get_file_suffix(path):
 def get_file_prefix(path):
     return os.path.splitext(os.path.basename(path))[0]
 
+def read_hex_from_bin(src_file):
+    """[read_list_from_txt]
+
+    Args:
+        src_file ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    if not os.path.isfile(src_file):
+        return []
+    line = []
+    try:
+        with open(src_file, 'rb') as rf:
+            line = list(bytearray.fromhex(rf.read().hex()))
+            return line
+    except Exception as err:
+        print(err)
 
 def read_list_from_txt(src_file):
     """[read_list_from_txt]
@@ -206,7 +253,8 @@ def write_bin_list_to_file(src_list, output='output.bin'):
             if isinstance(src_list, list):
                 for i in src_list:
                     # wf.write(bytes(i))
-                    wf.write(i.to_bytes(1, byteorder='little', signed=True))
+                    wf.write(int2Bytes(i, 1, signed=False, endion='little'))
+                    #wf.write(i.to_bytes(1, byteorder='little', signed=True))
             else:
                 wf.write(bytes(src_list))
     except Exception as err:
@@ -226,7 +274,7 @@ def write_bin_list_to_bmp(src_list, width, height, save_path=''):
 
     img = np.array(img_gray_8)
 
-    print(img.shape)
+    #print(img.shape)
     #rows,cols,dims = img.shape
 
     for i in range(height):
@@ -238,33 +286,66 @@ def write_bin_list_to_bmp(src_list, width, height, save_path=''):
     im = Image.fromarray(img)
     im.convert('L').save(save_path) # 保存为灰度图(8-bit)
 
-def connect_bmp(info_list, save_path=''):
+def connect_bmp(info_list, save_path='', using_offset=False):
     from PIL import Image
 
     # width = 500
-    width = 0
-    width_index = 0
-    height = 220
+    width_stitch_margin = 80
+    width_stitch_content = 0
+    width_stitch_package = 0
+    width_stitch_index = int(width_stitch_margin/2)
+    height_stitch_margin = 80
+    height_stitch_content = 180
+    height_stitch_package = height_stitch_margin + height_stitch_content
 
     for i in info_list:
-        width += i.get('width')
+        width_stitch_content += i.get('width')
+        if height_stitch_content < i.get('heigh') :
+            height_stitch_content = i.get('heigh')
+            height_stitch_package = i.get('heigh') + height_stitch_margin
+
+    width_stitch_package = width_stitch_margin + width_stitch_content
+
+    # print(info_list)
     # 创建空白图片
-    img_gray_8 = Image.new('L', (width, height), 128)
+    img_gray_8 = Image.new('L', (width_stitch_package, height_stitch_package), 128)
     for index,value in enumerate(info_list):
         img = Image.open(value.get('file_path')).convert("L")
-        img_gray_8.paste(img, (width_index , 20 ))
-        # img_gray_8.paste(img, (width_index , 20 + value.get('yset')))
-        width_index += value.get('width') 
-        # img_gray_8.paste(img, (width_index + value.get('xset'), 20 + value.get('yset')))
-        # width_index += value.get('width') + value.get('xset')
+        if using_offset:
+            xset_offset = 0
+            if False:
+                if value.get('xset') < 0 and index == 0:
+                    xset_offset = 0
+                else:
+                    xset_offset = value.get('xset')
+            imageWriter(img_gray_8, width_stitch_index + value.get('width')/2, int(height_stitch_margin/4), value.get('fuid'))
+            img_gray_8.paste(img, (width_stitch_index + xset_offset, int(height_stitch_margin/2) + value.get('yset')))
+            width_stitch_index += value.get('width') + xset_offset
+        else:
+            imageWriter(img_gray_8, width_stitch_index + value.get('width')/2, int(height_stitch_margin/4), value.get('fuid'))
+            img_gray_8.paste(img, (width_stitch_index , int(height_stitch_margin/2) ))
+            width_stitch_index += value.get('width') 
 
     img_gray_8.save(save_path)
+
+def imageWriter(img, x_pos, y_pos, number):
+    from PIL import Image, ImageDraw, ImageFont
+
+    #img = Image.open(filePath)
+    #size = img.size
+    #fontSize = size[1] / 4
+    draw = ImageDraw.Draw(img)
+    ttFont = ImageFont.load_default() # 默认字体
+    #ttFont = ImageFont.truetype('ahronbd.ttf', 50)
+    draw.text((x_pos, y_pos), str(number),fill=255 ,font=ttFont)
+    #draw.text((size[0]-fontSize, 0), str(number),fill=(255, 0, 0) ,font=ttFont)
+    #img.show()
 
 def stitch_image_long_figure(image_dir, save_path=''):
     from PIL import Image
     total_width = 0
     total_height = 220
-    width_index = 0
+    width_stitch_index = 0
 
     image_list = []
 
@@ -276,8 +357,8 @@ def stitch_image_long_figure(image_dir, save_path=''):
     img_gray_8 = Image.new('L', (total_width, total_height), 128)
     for value in image_list:
         img = Image.open(value.get('file_path')).convert("L")
-        img_gray_8.paste(img, (width_index , 20 ))
-        width_index += value.get('width')
+        img_gray_8.paste(img, (width_stitch_index , 20 ))
+        width_stitch_index += value.get('width')
 
     img_gray_8.save(save_path)
 
@@ -323,7 +404,7 @@ def strip_json(src_file='', output_file=''):
     """
 
     src_file = user_choice(u"请输入文件: ", lambda a: os.path.isfile(a), src_file)
-    output_file = user_choice(u"请输入保存的文件: ", lambda a: a is not '', output_file)
+    output_file = user_choice(u"请输入保存的文件: ", lambda a: a != '', output_file)
     if is_python2():
         with open(src_file, 'rb') as i, open(output_file, 'w') as o:
             o.write(json.dumps(json.loads(i.read()), ensure_ascii=False))
@@ -347,7 +428,7 @@ def is_json_file(src_file):
 
 def add_json(src_file='', output_file=''):
     src_file = user_choice(u"请输入文件: ", lambda a: os.path.isfile(a), src_file)
-    output_file = user_choice(u"请输入保存的文件: ", lambda a: a is not '', output_file)
+    output_file = user_choice(u"请输入保存的文件: ", lambda a: a != '', output_file)
     try:
         if is_python2():
             with open(src_file, 'rb') as i:
@@ -653,6 +734,50 @@ def cp_rf(from_dir, to_dir, target='dir', forced = False):
             os.remove(to_dir)
             shutil.copy(from_dir, to_dir)
             
+def table_prompt(content_list):
+    import prettytable as pt
+    tb = pt.PrettyTable()
+    tb.field_names = ["item", "名称"]
+    for index,item in enumerate(content_list):
+        if isinstance(item, list):
+            if len(item) >=2:
+                tb.add_row([f"{item[0]}",f"{item[1]}"])
+            else:
+                tb.add_row([f"{index}",f"{item[0]}"])
+        else:
+            tb.add_row([f"{index}",f"{item}"])
+    return tb
+
+def wait_rotate(header='', wait=False, cond_lambda=None, cond=None, slip_time=0.2):
+    import time
+    index=["/","─","\\","/"]
+    index=[logger.get_purple_text(i) for i in index]
+    if not wait:
+        for i in range(len(index)):
+            if cond_lambda:
+                if cond:
+                    if cond_lambda(cond):
+                        break
+                else:
+                    if cond_lambda():
+                        break
+            print("\r" + header + index[i], end="")
+            time.sleep(slip_time)
+    else:
+        while wait:
+                       
+            for i in range(len(index)):
+                if cond_lambda:
+                    if cond:
+                        if cond_lambda(cond):
+                            break
+                else:
+                    if cond_lambda():
+                        break
+                print("\r" + header + index[i], end="")
+                time.sleep(slip_time)
+
+
 
 def input_text(notice, color = False):
     if is_python2():
@@ -670,11 +795,19 @@ def input_text(notice, color = False):
             # param = input(u'{}'.format(notice))
     return param
 
-def user_choice(notice, cond, param, reset = False, color = False, debug=False):
+def user_choice(notice, cond, param, isDigit = False, reset = False, color = False, debug=False):
     if reset:
         param = ''
+    if isDigit and is_number(param):
+        param = str2int(param)
+    elif isDigit:
+        param = None
     while not cond(param):
         param = input_text(notice, color = color)
+        if isDigit and is_number(param):
+            param = str2int(param)
+            if param == -1:
+                print('user_choice is error!')
         if debug:
             print(f'>>>你的输入为:{param}')
     return param
@@ -684,8 +817,8 @@ def search_files_by_keyword(path='', keyword=''):
     target_dir = ''
     choice = ''
     path = user_choice(u"请输入需要搜索的文件夹路径: ", lambda a: os.path.isdir(a), path)
-    keyword = user_choice(u"请输入关键字[文件请输入*.txt]: ", lambda a: a is not '', keyword)
-    # keyword = user_choice(u"请输入关键字: ", lambda a: a is not '', keyword)
+    keyword = user_choice(u"请输入关键字[文件请输入*.txt]: ", lambda a: a != '', keyword)
+    # keyword = user_choice(u"请输入关键字: ", lambda a: a != '', keyword)
     if keyword and os.path.isfile(keyword):
         if is_csv_file(keyword):
             print(f'--------{keyword} is csv file-------')
@@ -698,7 +831,7 @@ def search_files_by_keyword(path='', keyword=''):
         print(f'已找到{len(result)}条搜索结果>>>>')
         choice = user_choice(u'是否需要将结果写入文件中[y/n]: ', lambda a: a in ['y', 'n'], choice, reset = True)
         if choice == 'y':
-            target_file = user_choice(u"请输入需要写入的文件名: ", lambda a: a is not '', target_file)
+            target_file = user_choice(u"请输入需要写入的文件名: ", lambda a: a != '', target_file)
             print(f'即将写入{target_file}>>>>')
             write_str_list_to_file(result, output=target_file, split_char='\n')
             print(f'写入成功>>>>')
@@ -741,7 +874,7 @@ def get_commands_list():
     return global_commands
 def functions():
     choice = 0
-    # choice = user_choice(u"你好:", lambda a: a is not '', choice, reset = True)
+    # choice = user_choice(u"你好:", lambda a: a != '', choice, reset = True)
     register_command('通过关键字搜索文件夹下匹配的对应文件', search_files_by_keyword)
     if get_commands_len() < 1:
         return

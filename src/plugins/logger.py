@@ -15,25 +15,64 @@ log_file = None
 
 # print(Fore.GREEN + 'it use green color to print str' + Fore.RESET)
 
-LOG_LEVEL= 4
 
-LOG_ERROR = 1
-LOG_WARN = 2
+LOG_ERROR = 5
+LOG_WARN = 4
 LOG_INFO = 3
-LOG_VERBOSE = 4
+LOG_DBG = 2
+LOG_VERBOSE = 1
+
+LOG_LEVEL_DIC = {
+        'erro' : LOG_ERROR,
+        'warn' : LOG_WARN,
+        'info' : LOG_INFO,
+        'dbg' : LOG_DBG,
+        'verb' : LOG_VERBOSE
+}
+LOG_LEVEL= LOG_VERBOSE
+
+
+'''
+字颜色:30-----------39
+30:黑
+31:红
+32:绿
+33:黄
+34:蓝色
+35:紫色
+36:深绿
+37:白色
+
+字背景颜色范围:40----49
+40:黑
+41:深红
+42:绿
+43:黄色
+44:蓝色
+45:紫色
+46:深绿
+47:白色
+'''
 
 class bcolors:
     HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    BOLDBLUE = '\033[1;94m'
+
+    BOLDRED = '\033[1;91m'
     BOLDGREEN = '\033[1;92m'
     BOLDYELLOW = '\033[1;93m'
+    BOLDBLUE = '\033[1;94m'
     BOLDPURPLE = '\033[1;94m'
-    BOLDRED = '\033[1;91m'
-    OKRED = '\033[32m'
-    OKYELLOW = '\033[34m'
+    
+    # 30 ~ 37 黑色~白色
+    OKBLACK = '\033[30m'
+    OKRED = '\033[31m'
+    OKGREEN = '033[32m'
+    OKYELLOW = '\033[33m'
+    OKBLUE = '\033[34m'
     OKPURPLE = '\033[35m'
+    DEEPGREEN = '\033[36m'
+    OKWHITE = '\033[37m'
+
     TITILEBLUE = '\033[1;36;40m'
     TITILEGREEN = '\033[1;32;40m'
     TITILEPURPLE = '\033[1;35;40m'
@@ -63,7 +102,7 @@ def LOGG(msg):
     print_with_color(msg, bcolors.OKGREEN, time_flag=False)
 
 def LOGB(msg):
-    print_with_color(msg, bcolors.OKBLUE, time_flag=False)
+    print_with_color(msg, bcolors.TITILEBLUE, time_flag=False)
 
 
 def LOGIG(msg):
@@ -91,26 +130,32 @@ def LOGV(*msg):
     msg_info = [str(i) for i in msg ]
     msg_info = ','.join(msg_info)
 
-    print_with_color(msg_info, bcolors.HEADER, tag = "VERB")
+    print_with_color(msg_info, bcolors.BOLDGREEN, tag = "verb")
 
 def LOGI(*msg):
     msg_info = ''
     for single_item in msg:
         msg_info += str(single_item)
-    print_with_color(msg_info, bcolors.HEADER, tag = "INFO")
+    print_with_color(msg_info, bcolors.BOLDBLUE, tag = "info")
+
+def LOGD(*msg):
+    msg_info = ''
+    for single_item in msg:
+        msg_info += str(single_item)
+    print_with_color(msg_info, bcolors.BOLDPURPLE, tag = "dbg")
 
 def LOGW(*msg):
     msg_info = ''
     for single_item in msg:
         msg_info += str(single_item)
-    print_with_color(msg_info, bcolors.HEADER, tag = "WARN")
+    print_with_color(msg_info, bcolors.OKYELLOW, tag = "warn")
 
 
 def LOGE(*msg):
     msg_info = ''
     for single_item in msg:
         msg_info += str(single_item)
-    print_with_color(msg_info, bcolors.HEADER, tag = "ERRO")
+    print_with_color(msg_info, bcolors.HEADER, tag = "erro")
 
 def get_appoint_color_text(msg='', fg='', bg='', bold=True):
     fg_color = {'black': 30, 'red': 31, 'green': 32, 'yellow': 33, 'blue': 34, 'purple': 35, 'cyan': 36, 'white': 37}
@@ -181,20 +226,17 @@ def get_color_text(msg, color, time_flag=False, tag='', intent=False, aligh_len=
    
     return text
 
+def set_log_level(level):
+    global LOG_LEVEL 
+    if level in LOG_LEVEL_DIC.keys():
+        LOG_LEVEL = LOG_LEVEL_DIC.get(level)
+
 def print_with_color(msg, color, time_flag=True, tag=''):
     time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    LOG_LEVEL_DIC = {
-        'ERRO' : 1,
-        'WARN' : 2,
-        'INFO' : 3,
-        'VERB' : 4
-    }
-
-    if LOG_LEVEL < LOG_LEVEL_DIC.get(tag):
-        return 
-
     if tag:
+        if LOG_LEVEL > LOG_LEVEL_DIC.get(tag):
+            return 
         log = '{:<20}\t{:<10}\t{}'.format(time, f'[{tag}]', msg)
     else:
         log = '{:<20}\t{}'.format(time, msg) if time_flag else '{}'.format(msg)
