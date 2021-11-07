@@ -19,9 +19,12 @@ global_frame_count = 0
 global_frame_head_len = 16
 
 GLOMAL_SPI_NORMAL = False
+GLOMAL_RDA_NORMAL = False
+GLOMAL_CLOUD_NORMAL = False
 
 g_stitich_image_using_offset = False
 g_local_logger_debug = False
+g_spi_protocol_nochecksum = False
 
 global_output_directory = {
     'cut_out_images': {
@@ -34,8 +37,10 @@ global_output_directory = {
     },
     'binary_images': {
         'dir': 'out/binary_images'
-    }
-    
+    },
+    'spi_binary_images': {
+        'dir': 'out/spi_binary_images'
+    } 
 }
 
 if os.name == 'posix':
@@ -124,6 +129,7 @@ def get_spi_frame_checksum(index, frame_list):
         return ( get_spi_frame_mosi_data(frame_list[index+15]) + get_spi_frame_mosi_data(frame_list[index+14]) * (2**8) )   
 
 def print_spi_frame_head(index, frame_list):
+    segement_print = 'checksum' if not GLOMAL_CLOUD_NORMAL else 'length' 
     logger.LOGV('TAG: {}'.format( get_spi_frame_tag(index, frame_list) ), \
             'version: {}'.format( get_spi_frame_version(index, frame_list) ), \
             'fuid: {}'.format( get_spi_frame_fuid(index, frame_list) ), \
@@ -134,7 +140,7 @@ def print_spi_frame_head(index, frame_list):
             'width: {}'.format( get_spi_frame_width(index, frame_list) ), \
             'heigh: {}'.format( get_spi_frame_heigh(index, frame_list) ), \
             'depth: {}'.format( get_spi_frame_depth(index, frame_list) ), \
-            'checksum: {}'.format( get_spi_frame_checksum(index, frame_list) )
+            '{}: {}'.format( segement_print, get_spi_frame_checksum(index, frame_list) ) 
         )
 
 def get_spi_rda_line_start_data(index, frame_list):
@@ -150,13 +156,24 @@ def get_spi_rda_data_index(index, frame_list):
     return get_spi_rda_line_start_data(index, frame_list) 
 
 
-def get_spi_frame_data(index, frame_list):
+def get_spi_frame_data(index, frame_list, data_type="PPKG"):
     local_width = get_spi_frame_width(index, frame_list)
     local_heigh = get_spi_frame_heigh(index, frame_list)
     local_checksum = get_spi_frame_checksum(index, frame_list)
 
     if GLOMAL_SPI_NORMAL:
-        return [ get_spi_frame_mosi_data(i) for i in frame_list[index + global_frame_head_len : index + global_frame_head_len + local_width * local_heigh] ]
+        if data_type == 'PPKG':
+            return [ get_spi_frame_mosi_data(i) for i in frame_list[index + global_frame_head_len : index + global_frame_head_len + local_width * local_heigh] ]
+        else:
+            return [ get_spi_frame_mosi_data(i) for i in frame_list[index : index  + global_frame_head_len + local_width * local_heigh] ]
+
+    elif GLOMAL_CLOUD_NORMAL:
+        if data_type == 'PPKG':
+            return [ get_spi_frame_mosi_data(i) for i in frame_list[index + global_frame_head_len : index + global_frame_head_len + local_checksum] ]
+        else:
+            return [ get_spi_frame_mosi_data(i) for i in frame_list[index : index + global_frame_head_len + local_checksum] ]
+
+    
 
     frames = int( (global_frame_head_len + local_heigh * local_width) / 128 )
     frames_remainder = int( (global_frame_head_len + local_heigh * local_width) % 128 )
@@ -196,8 +213,9 @@ def get_spi_frame_data(index, frame_list):
     if local_checksum != local_cal_checksum:
         logger.LOGE('SPI checksum fails')
         logger.LOGE(f'spi_checksum:{local_checksum}, calc_checksum:{local_cal_checksum}')
-        #return []
-        #exit_app()
+        return []
+        if not g_spi_protocol_nochecksum:
+            exit_app()
 
     return frame_data
 
@@ -211,8 +229,18 @@ def camera_spi_parse(frame, index, frame_list):
     global_frame_count += 1
     #logger.LOGV(index, global_frame_count)
     print_spi_frame_head(index, frame_list)
+    #print(frame_list)
+
+    # 生成spi协议数据
+    if GLOMAL_SPI_NORMAL: 
+        spi_protocol_frame_data = get_spi_frame_data(index, frame_list, data_type='DPKG')
+        spi_binary_images_save_path = os.path.join( global_output_directory.get('spi_binary_images').get('dir'), f'{global_frame_count}.bin')
+        #spi_binary_images_save_path = os.path.join( global_output_directory.get('spi_binary_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.bin')
+        generate_binary_images(spi_protocol_frame_data, output= spi_binary_images_save_path)
 
     spi_frame_data = get_spi_frame_data(index, frame_list)
+    if not spi_frame_data:
+        return
 
     #logger.LOGI('camera_spi_parse: ', len(spi_frame_data))
     # print(spi_frame_data)
@@ -223,8 +251,12 @@ def camera_spi_parse(frame, index, frame_list):
 
     logger.LOGD('generate_binary_images done')
     # 生成裁剪图片
-    cut_out_images_save_path = os.path.join(global_output_directory.get('cut_out_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.bmp')
-    generate_cut_out_images(spi_frame_data, width=get_spi_frame_width(index, frame_list), height=get_spi_frame_heigh(index, frame_list), output=cut_out_images_save_path)
+    if get_spi_frame_fmt(index, frame_list) == 0x30: #JPEG图片
+        cut_out_images_save_path = os.path.join(global_output_directory.get('cut_out_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.jpeg')
+        generate_binary_images(spi_frame_data, output= cut_out_images_save_path)
+    else:
+        cut_out_images_save_path = os.path.join(global_output_directory.get('cut_out_images').get('dir'), f'{global_frame_count}_{get_spi_frame_width(index, frame_list)}_{get_spi_frame_heigh(index, frame_list)}.bmp')
+        generate_cut_out_images(spi_frame_data, width=get_spi_frame_width(index, frame_list), height=get_spi_frame_heigh(index, frame_list), output=cut_out_images_save_path)
     logger.LOGD('generate_cut_out_images done')
     
     return {'width':get_spi_frame_width(index, frame_list), \
@@ -243,8 +275,13 @@ def get_spi_frame_info(frame, index, frame_list):
 
 def get_spi_data(file_name):
     frame_info = list()
-    
-    spi_data_list = utils.read_list_from_csv(file_name, column_num=-1)
+    if file_name.endswith('.csv'):
+        print('file_name, csv filestyle:%s'%file_name)
+        spi_data_list = utils.read_list_from_csv(file_name, column_num=-1)
+    else:
+        spi_data_list = utils.read_hex_from_bin(file_name)
+        spi_data_list = [ ['0x00', '0x00', '0x%02X'%i] for i in spi_data_list]
+        #print(spi_data_list)
     if not spi_data_list:
         return
     # logger.LOGV(spi_data_list)
@@ -252,7 +289,10 @@ def get_spi_data(file_name):
         if get_spi_frame_info(frame, index, spi_data_list):
             info = {}
             info = camera_spi_parse(frame, index, spi_data_list)
-            frame_info.append(info)
+            if not info:
+                continue
+            else:
+                frame_info.append(info)
 
     #print(frame_info)
     # 生成拼接图片
@@ -351,10 +391,11 @@ def parse_user_choice():
         parser = argparse.ArgumentParser(description='欢迎使用本打包工具')
         # parser.add_argument("-c", type=int, choices=[1,2], help="芯片类型[1:300x 2:4002][已废弃，使用默认资源，不支持修改]")
         parser.add_argument("--offset", dest="offset", action='store_true', help="使用偏移位置进行拼接")
+        parser.add_argument("--no-check", dest="nocheck", action='store_true', help="不进行checksum校验")
         parser.add_argument("--verb", dest="verb", action='store_true', help="打开VERB信息")
         parser.add_argument("--info", dest="info", action='store_true', help="打开info信息")
         parser.add_argument("--debug", dest="debug", action='store_true', help="打开调试信息")
-        parser.add_argument("-p", type=str, required = False, choices=['spi','rda'], help="协议形式: spi 或者 rda")
+        parser.add_argument("-p", type=str, required = False, choices=['spi','rda', 'cloud'], help="协议形式: spi 或者 rda 或者 cloud")
         parser.add_argument("-f", type=str, required = False, help="逻辑分析仪协议导出数据[*.csv]")
         parser.add_argument("-d", type=str, required = False, help="待拼接图片文件夹")
         parser.add_argument("-v", action="version", version=version_print())
@@ -370,7 +411,7 @@ def parse_user_choice():
         return args if args else None
 
 def main():
-    global GLOMAL_SPI_NORMAL
+    global GLOMAL_SPI_NORMAL, GLOMAL_RDA_NORMAL, GLOMAL_CLOUD_NORMAL
     global g_stitich_image_using_offset
     init()
 
@@ -379,8 +420,15 @@ def main():
     if not args:
         print('缺乏参数')
         return
-    GLOMAL_SPI_NORMAL = True if args.p == 'spi' else False
-
+    if args.p == 'rda':
+        GLOMAL_RDA_NORMAL = True
+    elif args.p == 'cloud':
+        GLOMAL_CLOUD_NORMAL = True
+    else:
+        GLOMAL_SPI_NORMAL = True
+    
+    if args.nocheck:
+        g_spi_protocol_nochecksum = True
     if args.offset:
         g_stitich_image_using_offset = True
     if args.debug:
