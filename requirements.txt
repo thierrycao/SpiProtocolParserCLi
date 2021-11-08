@@ -1,0 +1,7 @@
+pyinstaller
+tqdm
+pycallgraph
+colorama
+prettytable
+pillow
+numpy
