@@ -4,7 +4,7 @@
 name: Python application
 
 #env:
-#  dist_name: SpiProtocolParserCLi 
+#  env.dist_name: SpiProtocolParserCLi 
 
 on:
   push:
@@ -81,20 +81,20 @@ jobs:
       if: success() && ( runner.os == 'Linux')
       with:
         name: app-${{runner.os}}
-        path: dist/${{dist_name}}
+        path: dist/${{env.dist_name}}
     - name: Upload Artifact (macOS)
       uses: actions/upload-artifact@v2
       if: success() && ( runner.os == 'macOS' )
       with:
         name: app-${{runner.os}}
-        path: dist/${{dist_name}}
+        path: dist/${{env.dist_name}}
   
     - name: Upload Artifact (Windows)
       uses: actions/upload-artifact@v2
       if: runner.os == 'Windows' 
       with:
         name: app-${{runner.os}}
-        path: dist/${{dist_name}}.exe
+        path: dist/${{env.dist_name}}.exe
     
 
   deploy:
@@ -118,13 +118,13 @@ jobs:
       - name: Check Meta Data (Linux || macOS)
         if: success() && ( runner.os == 'Linux' || runner.os == 'macOS' )
         run: |
-          if [[ -e ${dist_name} ]];then echo "${dist_name} exists" ;else echo "${dist_name} not exists"; fi
-          ls ${dist_name}
+          if [[ -e ${{env.dist_name}} ]];then echo "${{env.dist_name}} exists" ;else echo "${{env.dist_name}} not exists"; fi
+          ls ${{env.dist_name}}
 
       - name: Check Meta Data (Windows)
         if: runner.os == 'Windows'
         run: |
-          ls ${dist_name}.exe
+          ls ${{env.dist_name}}.exe
         shell: pwsh
 
       - name: Create Release
@@ -148,8 +148,8 @@ jobs:
         if: success() && (runner.os == 'Linux' || runner.os == 'macOS')
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ${{dist_name}}
-          asset_name: ${{dist_name}}_${{ github.ref }}.zip
+          asset_path: ${{env.dist_name}}
+          asset_name: ${{env.dist_name}}_${{ github.ref }}.zip
           asset_content_type: application/gzip
       - name: Upload Release Asset(Windows)
         id: upload-release-asset-windows
@@ -159,6 +159,6 @@ jobs:
         if: runner.os == 'Windows'
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ${{dist_name}}.exe
-          asset_name: ${{dist_name}}_${{ github.ref }}.zip
+          asset_path: ${{env.dist_name}}.exe
+          asset_name: ${{env.dist_name}}_${{ github.ref }}.zip
           asset_content_type: application/gzip
