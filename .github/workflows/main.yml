@@ -80,14 +80,14 @@ jobs:
       uses: actions/upload-artifact@v2
       if: success() && ( runner.os == 'Linux' || runner.os == 'macOS')
       with:
-        name: app-${{runner.os}}
+        name: ${{env.dist_name}}-${{runner.os}}
         path: dist/${{env.dist_name}}
    
     - name: Upload Artifact (Windows)
       uses: actions/upload-artifact@v2
       if: runner.os == 'Windows' 
       with:
-        name: app-${{runner.os}}
+        name: ${{env.dist_name}}-${{runner.os}}
         path: dist/${{env.dist_name}}.exe
     
   publish:
@@ -131,13 +131,7 @@ jobs:
     #runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download build result for app
-        # 自动解压缩到当前文件夹，自动删除原压缩文件
-        #if: steps.prepare_release.outputs.tag_name
-        uses: actions/download-artifact@v2
-        with:
-          name: app-${{runner.os}}
-          path: ./
+      
       - name: Download Publish Url for app
         # 自动解压缩到当前文件夹，自动删除原压缩文件
         #if: steps.prepare_release.outputs.tag_name
@@ -151,17 +145,29 @@ jobs:
         run: |
           echo "upload_url=$(cat upload_url)" >> $GITHUB_ENV
           echo "dist_name=SpiProtocolParserCLi" >> $GITHUB_ENV
+          echo "tag_name=$(echo ${{github.ref }} | awk -F/ '{print $3}' )" >> $GITHUB_ENV
           echo "env.upload_url:${{env.upload_url}}"
           echo "env.dist_name:${{env.dist_name}}"
+          echo "env.tag_name:${{env.tag_name}}"
       - name: Set Up Environment(Windows)
         id: setup_env_windows
         if: runner.os == 'Windows'
         run: |
           echo "upload_url=$(cat upload_url)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "dist_name=SpiProtocolParserCLi" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "tag_name=$(echo ${{github.ref }} | awk -F/ '{print $3}' )" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "env.upload_url:${{env.upload_url}}"
           echo "env.dist_name:${{env.dist_name}}"
+          echo "env.tag_name:${{env.tag_name}}"
 
+      - name: Download build result for app
+        # 自动解压缩到当前文件夹，自动删除原压缩文件
+        #if: steps.prepare_release.outputs.tag_name
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{env.dist_name}}-${{runner.os}}
+          path: ./
+          
       - name: Check Meta Data (Linux || macOS)
         if: success() && ( runner.os == 'Linux' || runner.os == 'macOS' )
         run: |
@@ -179,22 +185,20 @@ jobs:
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_REF: $( echo ${{github.ref }} | awk -F/ '{print $3}' )
         if: success() && (runner.os == 'Linux' || runner.os == 'macOS')
         with:
           upload_url: ${{ env.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ${{env.dist_name}}
-          asset_name: ${{env.dist_name}}_${{runner.os}}_${{ env.TAG_REF }}.zip
+          asset_name: ${{env.dist_name}}_${{runner.os}}_${{ env.tag_name }}.zip
           asset_content_type: application/gzip
       - name: Upload Release Asset(Windows)
         id: upload-release-asset-windows
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_REF: $( echo ${{github.ref }} | awk -F/ '{print $3}' )
         if: runner.os == 'Windows'
         with:
           upload_url: ${{ env.upload_url }} 
           asset_path: ${{ env.dist_name }}.exe
-          asset_name: ${{env.dist_name}}_${{runner.os}}_${{ env.TAG_REF }}.zip
+          asset_name: ${{env.dist_name}}_${{runner.os}}_${{ env.tag_name }}.zip
           asset_content_type: application/gzip
