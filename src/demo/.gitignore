@@ -1,2 +1,4 @@
 out
 out1
+*.csv
+.DS_Store
