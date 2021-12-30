@@ -633,10 +633,10 @@ def app_main(file_name):
 def version_print():
     import time
     description = [
-['Version', 'v1.0' ],
+['Version', 'v1.3' ],
 ['Time', time.ctime() ], 
 ['Author', 'theirrycao' ],
-['RELEASE', '支持SPI协议和RDA协议解析，默认是SPI协议' ]
+['RELEASE', '支持SPI协议和RDA协议解析，支持text、audio的格式，默认是SPI协议' ]
 ]
     description = utils.table_prompt(description)
     #description = logger.get_yellow_text(description)

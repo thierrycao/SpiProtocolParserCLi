@@ -22,13 +22,21 @@ def get_platform_system():
 def isPlatformWin():
     return True if get_platform_system() == 'Windows' else False
 
+def get_python_root_dir():
+    import sys
+    python_root_dir = ''
+    if not isPlatformWin():
+        python_root_dir = [i for i in sys.path if 'site-packages' in i][0]
+    return python_root_dir
+
 def build_dist():
     from PyInstaller.__main__ import run
     if isPlatformWin():
         
         opts = ['-F', 
-                '--paths=H:\\tools\\dev\\Anaconda3\\envs\\py37',             
-                '--paths=H:\\tools\\dev\\Anaconda3\\envs\\py37\\Lib\\site-packages',
+                # '--paths=H:\\tools\\dev\\Anaconda3\\envs\\py37',             
+                # '--paths=H:\\tools\\dev\\Anaconda3\\envs\\py37\\Lib\\site-packages',
+                '--paths={}'.format(get_python_root_dir()),
                 '--add-data={};res'.format(os.path.join(get_current_file_path(), './demo/spec/res')),
                 '--i={}'.format(os.path.join(get_current_file_path(), './demo/spec/favorite/_ico.ico')),
                 '--upx-dir=D:\\workshop\\home\\workshop\\abc\\script\\core\\aux\\utils\\',
@@ -46,8 +54,9 @@ def build_dist():
         run(opts)
     else:
         opts = ['-F', 
-                '--paths=/Users/abc/workshop/abc/project/utils/anaconda3/envs/py37',             
-                '--paths=/Users/abc/workshop/abc/project/utils/anaconda3/envs/py37/lib/python3.7/site-packages',
+                # '--paths=/Users/abc/workshop/abc/project/utils/anaconda3/envs/py37',             
+                # '--paths=/Users/abc/workshop/abc/project/utils/anaconda3/envs/py37/lib/python3.7/site-packages',
+                '--paths={}'.format(get_python_root_dir()),
                 #'--add-data={};res'.format(os.path.join(get_current_file_path(), './demo/spec/res')),
                 '--i={}'.format(os.path.join(get_current_file_path(), './demo/spec/favorite/_ico.ico')),
                 #'--upx-dir=D:\\workshop\\home\\workshop\\abc\\script\\core\\aux\\utils\\',
