@@ -263,6 +263,8 @@ def write_bin_list_to_file(src_list, output='output.bin'):
 def write_bin_list_to_bmp(src_list, width, height, save_path=''):
     from PIL import Image
     import numpy as np
+
+    print("src_list=>len:{}, width:{}, height:{}".format(len(src_list), width, height))
     # import matplotlib.pyplot as plt
     # width = 46
     # height = 180
@@ -363,6 +365,16 @@ def stitch_image_long_figure(image_dir, save_path=''):
     img_gray_8.save(save_path)
 
 
+def write_list_to_file(src_list, output='output.txt'):
+    if not (src_list):
+        return
+    # print('output to txt:{}'.format(src_list))
+    src_list = [ hex(i) for i in src_list ]
+    try:
+        with open(output, 'w', encoding='utf-8') as wf:
+            wf.write(" ".join(src_list))
+    except Exception as err:
+        print(err)
 
 def write_str_list_to_file(src_list, output='output.txt', split_char='\n'):
     """[write_str_list_to_file]
@@ -486,19 +498,25 @@ def load_file_dump_bytes(src_file=''):
     except Exception as err:
         print(err)
 
-def read_list_from_csv(src_file, column_num=0):
+def read_list_from_csv(src_file, line_num = None, column_num = None):
     lines = []
     if not (src_file and os.path.isfile(src_file)):
         return lines
     try:     
         with open(src_file, 'r') as cf:
-            obj = csv.reader(cf)
-            for i in obj:
-                # print(type(i), i)
-                if column_num == -1:
-                    lines.append(i)
-                else:
-                    lines.append(i[column_num])
+            obj = list(csv.reader(cf))
+            lines = obj
+            # print(obj)
+            print('123')
+            if is_number(line_num) and line_num < len(obj):
+                lines = obj[0:line_num]
+                return lines
+            if column_num == None:
+                lines = obj
+                return lines
+            if is_number(column_num) and column_num < len(obj[0]):
+                lines = [i[column_num] for i in obj]
+                return lines
             
     except Exception as e:
         print(type(e), e)
